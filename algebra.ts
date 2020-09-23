@@ -1,7 +1,8 @@
 import { arrayEqual, pick, range } from "./utils.ts";
 
 export type Scalar = number;
-export type MultiVector = [Scalar, ...Scalar[]];
+/** Scalar multiples of the algebra basis */
+export type MultiVector = Scalar[];
 export type VectorIdx = number;
 
 export type Term = Scalar | [VectorIdx];
@@ -37,7 +38,7 @@ export class Algebra {
                     if(typeof second === 'number') return inner([second, head, ...tail]);
                     else if(head[0] > second[0]) return inner([-1, second, head, ...tail]);
                     else if(head[0] === second[0]) {
-                        if(head[0] < this.zero) return tail;
+                        if(head[0] < this.zero) return [0, ...tail];
                         else if(head[0] < this.zero + this.positive) return [1, ...tail];
                         else return [-1, ...tail];
                     } else return ts;
@@ -46,9 +47,15 @@ export class Algebra {
         };
 
         const simplified = inner(ts);
-        if(simplified.length === 0) return [0];
-        else if(typeof simplified[0] !== 'number') return [1, ...simplified.map(x => (x as [number])[0])];
-        else return [simplified[0], ...simplified.slice(1).map(x => (x as [number])[0])];
+
+        const scalar = simplified.length === 0
+            ? 0
+            : typeof simplified[0] === 'number' ? simplified[0] : 1;
+        const vecs = new Set(
+            (typeof simplified[0] === 'number' ? simplified.slice(1) : simplified)
+                .map(t => (t as [Scalar])[0])
+        );
+        return this.basis().map((vs, idx) => vs.length === 0 ? scalar : vecs.has(idx) ? 1 : 0);
     }
 
     elementBlade(elem: VectorIdx[]): number {
@@ -63,5 +70,11 @@ export class Algebra {
 const pga2 = new Algebra(2, 0, 1);
 const pga3 = new Algebra(3, 0, 1);
 
-console.log(pga2.reverse(pga2.basis().map(() => 1) as MultiVector));
-console.log(pga3.reverse(pga3.basis().map(() => 1) as MultiVector));
+console.log('reverse pga2', pga2.reverse(pga2.basis().map(() => 1) as MultiVector));
+console.log('reverse pga3', pga3.reverse(pga3.basis().map(() => 1) as MultiVector));
+
+console.log('Simplify 1 * 2 * 3', pga2.simplify([1, 2, 3]));
+console.log('Simplify e2 * 3 * e1', pga2.simplify([[2], 3, [1]]));
+console.log('Simplify e2 * 3 * e1 * e2', pga2.simplify([[2], 3, [1], [2]]));
+console.log('Simplify e0 * e0', pga2.simplify([[0], [0]]));
+console.log('Simplify e0 * 3 * e1 * e0', pga2.simplify([[0], 3, [1], [0]]));
