@@ -1,13 +1,14 @@
-import { arrayEqual, pick, range } from "./utils.ts";
+import { pick, range } from "./utils.ts";
 
 export type Scalar = number;
-/** Scalar multiples of the algebra basis */
-export type MultiVector = Scalar[];
+/** Ordered, comma sep list of vectors */
+export type BasisName = string;
+export type MultiVector = {
+    [basis: string]: Scalar; // BasisName -> Scalar
+};
 export type VectorIdx = number;
 
 export type Term = Scalar | [VectorIdx];
-
-// Vectors are laid out in order zeros, positives, negatives (just like bivector.net)
 
 export class Algebra {
     constructor(
@@ -16,13 +17,15 @@ export class Algebra {
         readonly zero: number
     ) {}
 
-    blades(): VectorIdx[][][] {
+    blades(): BasisName[][] {
         const vectorCount = this.positive + this.negative + this.zero;
         const vecs: VectorIdx[] = Array.from(range(0, vectorCount - 1));
-        return Array.from(range(0, vectorCount)).map(n => pick(n, vecs));
+        return Array.from(range(0, vectorCount))
+            .map(n => pick(n, vecs))
+            .map(vs => vs.map(vs2 => vs2.join()));
     }
 
-    basis(): VectorIdx[][] {
+    basis(): BasisName[] {
         return this.blades().flat();
     }
 
@@ -51,27 +54,40 @@ export class Algebra {
         const scalar = simplified.length === 0
             ? 0
             : typeof simplified[0] === 'number' ? simplified[0] : 1;
-        const vecs = new Set(
-            (typeof simplified[0] === 'number' ? simplified.slice(1) : simplified)
-                .map(t => (t as [Scalar])[0])
-        );
-        return this.basis().map((vs, idx) => vs.length === 0 ? scalar : vecs.has(idx) ? 1 : 0);
+        if (scalar === 0) return {};
+
+        const vecs = typeof simplified[0] === 'number' ? simplified.slice(1) : simplified;
+        const parts: [BasisName, Scalar][] = [
+            ["", scalar],
+            ...vecs.map<[BasisName, Scalar]>(v => [(v as [VectorIdx])[0].toString(), 1])
+        ];
+
+        return Object.fromEntries(parts.filter(([bn, s]) => s !== 0));
     }
 
-    elementBlade(elem: VectorIdx[]): number {
-        return this.blades().findIndex(b => b.some(e => arrayEqual(elem, e)));
+    basisBlade(basis: BasisName): number {
+        return this.blades().findIndex(b => b.includes(basis));
     }
 
     reverse(mv: MultiVector): MultiVector {
-        return mv.map((x, idx) => x * (this.elementBlade(this.basis()[idx]) % 4 > 1 ? -1 : 1)) as MultiVector;
+        return Object.fromEntries(
+            Object.entries(mv)
+                .map(([bn, s]) => [bn, s * this.basisBlade(bn) % 4 > 1 ? -1 : 1])
+        );
     }
 }
 
 const pga2 = new Algebra(2, 0, 1);
 const pga3 = new Algebra(3, 0, 1);
 
-console.log('reverse pga2', pga2.reverse(pga2.basis().map(() => 1) as MultiVector));
-console.log('reverse pga3', pga3.reverse(pga3.basis().map(() => 1) as MultiVector));
+console.log('pga2 blades', pga2.blades());
+console.log('pga3 blades', pga3.blades());
+
+console.log('pga2 basis', pga2.basis());
+console.log('pga3 basis', pga3.basis());
+
+console.log('reverse pga2', pga2.reverse(Object.fromEntries(pga2.basis().map(bn => [bn, 1]))));
+console.log('reverse pga3', pga3.reverse(Object.fromEntries(pga3.basis().map(bn => [bn, 1]))));
 
 console.log('Simplify 1 * 2 * 3', pga2.simplify([1, 2, 3]));
 console.log('Simplify e2 * 3 * e1', pga2.simplify([[2], 3, [1]]));

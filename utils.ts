@@ -13,7 +13,3 @@ export function pick<T>(n: number, xs: T[]): T[][] {
             .concat(pick(n, tail));
     }
 }
-
-export function arrayEqual<T>(xs: T[], ys: T[]): boolean {
-    return xs.length === ys.length && xs.every((x, idx) => x === ys[idx]);
-}
