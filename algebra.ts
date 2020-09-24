@@ -10,8 +10,12 @@ export type VectorIdx = number;
 
 export type Term = Scalar | [VectorIdx];
 
+export function vectorsOfBasisName(bn: BasisName): BasisName[] {
+    return bn.split(',').filter(v => v !== '');
+}
+
 export function basisNameTerms(bn: BasisName): Term[] {
-    return bn.split(',').filter(v => v !== '').map(v => [parseInt(v, 10)]);
+    return vectorsOfBasisName(bn).map(v => [parseInt(v, 10)]);
 }
 
 export class Algebra {
@@ -21,11 +25,15 @@ export class Algebra {
         readonly zero: number
     ) {}
 
-    blades(): BasisName[][] {
+    vectors(): BasisName[] {
         const vectorCount = this.positive + this.negative + this.zero;
-        const vecs: VectorIdx[] = Array.from(range(0, vectorCount - 1));
-        return Array.from(range(0, vectorCount))
-            .map(n => pick(n, vecs))
+        return Array.from(range(0, vectorCount - 1))
+            .map(v => v.toString());
+    }
+
+    blades(): BasisName[][] {
+        return Array.from(range(0, this.vectors().length))
+            .map(n => pick(n, this.vectors()))
             .map(vs => vs.map(vs2 => vs2.join()));
     }
 
@@ -75,6 +83,22 @@ export class Algebra {
         );
     }
 
+    /** Hodge Star */
+    dual(mv: MultiVector): MultiVector {
+        // I think we need to solve `b * x = PSS` for x against each basis `b` of `mv`
+        const mvs = Object
+            .entries(mv)
+            .map(([bn, s]) => {
+                const vs = vectorsOfBasisName(bn);
+                const rhs = this.vectors().filter(v => !vs.includes(v)).join();
+                const result = this.simplify([s, ...basisNameTerms(bn), ...basisNameTerms(rhs)]);
+                const sign = Math.sign(result[this.vectors().join()] || 0);
+                return this.simplify([sign, Math.abs(s), ...basisNameTerms(rhs)]);
+            });
+
+        return this.sum(...mvs);
+    }
+
     sum(...mvs: MultiVector[]): MultiVector {
         return mvs.flatMap(Object.entries)
             .reduce((p, [bn, s]) => ({ ...p, [bn]: (p[bn] || 0) + s }) , {} as any);
@@ -95,6 +119,3 @@ export class Algebra {
         return mvs.reduce(mulTwo, { "": 1 } as MultiVector);
     }
 }
-
-const pga2 = new Algebra(2, 0, 1);
-const pga3 = new Algebra(3, 0, 1);
