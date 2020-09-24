@@ -10,6 +10,10 @@ export type VectorIdx = number;
 
 export type Term = Scalar | [VectorIdx];
 
+export function basisNameTerms(bn: BasisName): Term[] {
+    return bn.split(',').filter(v => v !== '').map(v => [parseInt(v, 10)]);
+}
+
 export class Algebra {
     constructor(
         readonly positive: number,
@@ -57,12 +61,7 @@ export class Algebra {
         if (scalar === 0) return {};
 
         const vecs = typeof simplified[0] === 'number' ? simplified.slice(1) : simplified;
-        const parts: [BasisName, Scalar][] = [
-            ["", scalar],
-            ...vecs.map<[BasisName, Scalar]>(v => [(v as [VectorIdx])[0].toString(), 1])
-        ];
-
-        return Object.fromEntries(parts.filter(([bn, s]) => s !== 0));
+        return { [vecs.join()]: scalar };
     }
 
     basisBlade(basis: BasisName): number {
@@ -75,22 +74,27 @@ export class Algebra {
                 .map(([bn, s]) => [bn, s * this.basisBlade(bn) % 4 > 1 ? -1 : 1])
         );
     }
+
+    sum(...mvs: MultiVector[]): MultiVector {
+        return mvs.flatMap(Object.entries)
+            .reduce((p, [bn, s]) => ({ ...p, [bn]: (p[bn] || 0) + s }) , {} as any);
+    }
+
+    mul(...mvs: MultiVector[]): MultiVector {
+        const mulTwo = (mv1: MultiVector, mv2: MultiVector): MultiVector => {
+            const mvs = Object.entries(mv1).flatMap(([bn, s]) => {
+                const left = [s, ...basisNameTerms(bn)];
+                return Object.entries(mv2).map(([bn, s]) => {
+                    const right = [s, ...basisNameTerms(bn)];
+                    return this.simplify([...left, ...right]);
+                })
+            });
+            return this.sum(...mvs);
+        }
+
+        return mvs.reduce(mulTwo, { "": 1 } as MultiVector);
+    }
 }
 
 const pga2 = new Algebra(2, 0, 1);
 const pga3 = new Algebra(3, 0, 1);
-
-console.log('pga2 blades', pga2.blades());
-console.log('pga3 blades', pga3.blades());
-
-console.log('pga2 basis', pga2.basis());
-console.log('pga3 basis', pga3.basis());
-
-console.log('reverse pga2', pga2.reverse(Object.fromEntries(pga2.basis().map(bn => [bn, 1]))));
-console.log('reverse pga3', pga3.reverse(Object.fromEntries(pga3.basis().map(bn => [bn, 1]))));
-
-console.log('Simplify 1 * 2 * 3', pga2.simplify([1, 2, 3]));
-console.log('Simplify e2 * 3 * e1', pga2.simplify([[2], 3, [1]]));
-console.log('Simplify e2 * 3 * e1 * e2', pga2.simplify([[2], 3, [1], [2]]));
-console.log('Simplify e0 * e0', pga2.simplify([[0], [0]]));
-console.log('Simplify e0 * 3 * e1 * e0', pga2.simplify([[0], 3, [1], [0]]));
