@@ -79,7 +79,7 @@ export class Algebra {
     reverse(mv: MultiVector): MultiVector {
         return Object.fromEntries(
             Object.entries(mv)
-                .map(([bn, s]) => [bn, s * this.basisBlade(bn) % 4 > 1 ? -1 : 1])
+                .map(([bn, s]) => [bn, s * (this.basisBlade(bn) % 4 > 1 ? -1 : 1)])
         );
     }
 
