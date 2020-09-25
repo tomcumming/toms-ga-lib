@@ -133,4 +133,9 @@ export class Algebra {
 
         return mvs.reduce(mulTwo, { "": 1 } as MultiVector);
     }
+
+    selectGrade(mv: MultiVector, ...grades: number[]): MultiVector {
+        const basis = new Set(grades.flatMap(k => this.blades()[k]));
+        return Object.fromEntries(Object.entries(mv).filter(([bn, _s]) => basis.has(bn)));
+    }
 }
