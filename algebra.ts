@@ -99,6 +99,21 @@ export class Algebra {
         return this.sum(...mvs);
     }
 
+    unDual(mv: MultiVector): MultiVector {
+        // Like above but solve `x * b = PSS` for x against each basis `b` of `mv`?
+        const mvs = Object
+            .entries(mv)
+            .map(([bn, s]) => {
+                const vs = vectorsOfBasisName(bn);
+                const rhs = this.vectors().filter(v => !vs.includes(v)).join();
+                const result = this.simplify([s, ...basisNameTerms(rhs), ...basisNameTerms(bn)]);
+                const sign = Math.sign(result[this.vectors().join()] || 0);
+                return this.simplify([sign, Math.abs(s), ...basisNameTerms(rhs)]);
+            });
+
+        return this.sum(...mvs);
+    }
+
     sum(...mvs: MultiVector[]): MultiVector {
         return mvs.flatMap(Object.entries)
             .reduce((p, [bn, s]) => ({ ...p, [bn]: (p[bn] || 0) + s }) , {} as any);

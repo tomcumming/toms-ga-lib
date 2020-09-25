@@ -45,3 +45,12 @@ Deno.test("PGA3D duals match PGA4CS examples when negative", () => {
         assertEquals(pga3d.dual(leftSimplified), rightSimplified);
     }
 });
+
+Deno.test("(unDual . dual) is id with PGA4CS examples", () => {
+    for(const [left, _right] of exampleDuals) {
+        const leftPositive = pga3d.simplify(left);
+        const leftNegative = pga3d.simplify([-1, ...left]);
+        assertEquals(pga3d.unDual(pga3d.dual(leftPositive)), leftPositive);
+        assertEquals(pga3d.unDual(pga3d.dual(leftNegative)), leftNegative);
+    }
+});
